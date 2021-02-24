@@ -1,0 +1,96 @@
+Prepare the Environment
+
+Restore a backup:
+
+Change to the postgres user:
+
+sudo su - postgres
+
+Create the database to be restored:
+
+createdb acweb
+
+Download the backup from GitHub:
+
+wget https://github.com/linuxacademy/content-postgresql-deepdive/raw/master/acweb/acweb.tar
+
+Use pg_restore to restore the backup:
+
+pg_restore --dbname=acweb --verbose /var/lib/pgsql/acweb.tar
+
+Launch psql and verify the data is present:
+
+psql
+
+List the databases with \l.
+
+Connect to acweb:
+
+\c acweb
+
+Get a count for the payment table:
+
+SELECT COUNT(*) FROM sales.payment;
+
+Exit psql:
+
+\q
+
+Generate load against the database:
+
+Download a script to generate load against the database:
+
+wget https://raw.githubusercontent.com/linuxacademy/content-postgresql-deepdive/master/acweb/loadgen.sh
+
+Modify the file to be executable:
+
+chmod +x loadgen.sh
+
+Execute the script in the background:
+
+./loadgen.sh > /dev/null 2>&1 &
+
+Evaluate Load-Generating Sessions
+
+Launch psql and turn on expanded display:
+
+psql
+\x
+
+Execute the query below against the pg_stat_activity system catalog:
+
+SELECT pid, datname, usename, application_name, client_addr, xact_start, wait_event_type, wait_event, state, query FROM pg_stat_activity WHERE application_name = 'psql';
+
+Note in particular the wait information. You may have to run it a few times, but you should begin to see evidence of both write and read I/O.
+
+List the Size of the Database and Tables
+
+Connect to the acweb database:
+
+\c acweb
+
+Execute the following query to acquire the database size:
+
+SELECT pg_size_pretty(pg_database_size(current_database()));
+
+Execute the following query to acquire the size of all tables in the sales schema:
+
+SELECT table_schema, table_name, pg_size_pretty(pg_relation_size('"'||table_schema||'"."'||table_name||'"')) AS size FROM information_schema.tables WHERE table_schema = 'sales' ORDER BY size DESC;
+
+Find All of the VARCHAR Columns
+
+Execute the following query to list all columns of the type VARCHAR in the sales schema:
+
+SELECT columns.attname as name,
+ data_types.typname as type,
+ class.relname as table,
+ tables.schemaname as schema
+FROM pg_attribute columns
+INNER JOIN pg_class class ON columns.attrelid = class.oid
+INNER JOIN pg_tables tables on class.relname = tables.tablename
+INNER JOIN pg_type data_types 
+ON columns.atttypid = data_types.oid
+WHERE tables.schemaname = 'sales'
+AND data_types.typname = 'varchar';
+
+Note how we can join multiple system catalogs together in order to obtain more useful information.
